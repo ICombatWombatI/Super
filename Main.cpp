@@ -7,7 +7,7 @@ using namespace std;
 
 void main()
 {
-
+	//
 	try
 	{
 		WORD ver = MAKEWORD(2, 2);
