@@ -6,7 +6,7 @@ using namespace std;
 #include <process.h>
 #include <windows.h>
 #include <string>
-
+#include <time.h>
 
 #define REQ_WINSOCK_VER 2
 #pragma comment (lib,"ws2_32.lib")
@@ -26,12 +26,18 @@ public:
 
 private:
 	WSADATA wsaData;
-	SOCKET listening;
-	SOCKET ClientSocket;
+	SOCKET sServerListen;
+	SOCKET ClientSockets;
 	sockaddr_in hint;
 	sockaddr_in client;
+	FD_SET ReadSet, WriteSet;
 
-	char Buffer[1024];
+	int readySock = 0;
+	int bytesReceived = 0;
+	int TotalSocket =0 ;
+
+	char SendText[1024];	
+	char RecvText[1024];
 
 	void SetServerSockAddr(sockaddr_in *sockAddr, int PortNumber);
 };
@@ -133,6 +139,7 @@ class  StremServer
 
 	public:
 
+
 	int  f_ready;
 		// флаг остановки
 	int  f_stop;
@@ -142,6 +149,7 @@ class  StremServer
 	CRITICAL_SECTION mguard;
 
 	HANDLE server_h;
+
 
 	void initializeCS();
 

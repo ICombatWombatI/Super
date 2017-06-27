@@ -14,10 +14,10 @@ WSockServer::~WSockServer()
 {
 	if (WSACleanup() != 0)
 		throw "Cleanup failed.";
-	if (listening != INVALID_SOCKET)
-		closesocket(listening);
-	if (ClientSocket != INVALID_SOCKET)
-		closesocket(listening);
+	if (sServerListen != INVALID_SOCKET)
+		closesocket(sServerListen);
+	if (ClientSockets != INVALID_SOCKET)
+		closesocket(sServerListen);
 }
 
 
@@ -31,84 +31,150 @@ void WSockServer::SetServerSockAddr(sockaddr_in *hint, int PortNumber)
 bool WSockServer::RunServer(int PortNumber)
 {
 
-	if ((listening = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET)	
-		throw "Could not create socket.";
+	sServerListen = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
+	if (sServerListen == SOCKET_ERROR)
+	{
+		throw "sServerListen == SOCKET_ERROR";
+	}
+
+	ULONG ulBlock;
+	ulBlock = 1;
+	if (ioctlsocket(sServerListen, FIONBIO, &ulBlock) == SOCKET_ERROR)
+	{
+		throw "ulBlocking fail";
+	}
 
 	SetServerSockAddr(&hint, PortNumber);
 
-	if (bind(listening, (sockaddr*)(&hint), sizeof(hint)) != 0)
+	if (bind(sServerListen, (sockaddr*)(&hint), sizeof(hint)) != 0)
 		throw "Could not bind socket.";
 
-	if (listen(listening, SOMAXCONN) != 0)
+	if (listen(sServerListen, 4) != 0)
 		throw "Could not put the socket in listening mode.";
-
 
 	int clientsize = sizeof(client);
 
 	cout << "Waiting for clients... ";
-	ClientSocket = accept(listening, (sockaddr*)&client, &clientsize);
+	//char host[NI_MAXHOST]; //имя клиента(что то вроде)
+	//char service[NI_MAXSERV];
 
-	char host[NI_MAXHOST]; //имя клиента(что то вроде)
-	char service[NI_MAXSERV];
+	//cout << endl << "Server settings: " << endl;
+	//cout << "IP: " << inet_ntop(AF_INET, &client.sin_addr, host, NI_MAXHOST) << endl;
+	//cout << "PORT: " << ntohs(client.sin_port) << endl << endl;
 
-	cout << endl << "Server settings: " << endl;
-	cout << "IP: " << inet_ntop(AF_INET, &client.sin_addr, host, NI_MAXHOST) << endl;
-	cout << "PORT: " << ntohs(client.sin_port) << endl << endl;
-
-	getnameinfo((sockaddr*)&client, sizeof(client), host, NI_MAXHOST, service, NI_MAXSERV, 0);
-	cout << host << endl;
-
+	//getnameinfo((sockaddr*)&client, sizeof(client), host, NI_MAXHOST, service, NI_MAXSERV, 0);
+	//cout << host << endl;
 	return true;
 }
 
 void WSockServer::StartChat()
 {
+
 	while (true)
 	{
-			ZeroMemory(Buffer, 1024);
-			int bytesReceived = recv(ClientSocket, Buffer, 1024, 0);// получаем данные от клиента
+		ZeroMemory(SendText, 1024);
+		ZeroMemory(RecvText, 1024);
 
+	//	cin.getline(SendText, 1024, '\n');
 
-			if (bytesReceived == SOCKET_ERROR)
+		//////////////////////////////////////////////////////////////////////////////////
+		FD_ZERO(&ReadSet);
+		FD_ZERO(&WriteSet);
+
+		FD_SET(sServerListen, &ReadSet);
+		//////////////////////////////////////////////////////////////////////////////////
+		if (TotalSocket)
+		{
+			if (ClientSockets != INVALID_SOCKET)
+				FD_SET(ClientSockets, &ReadSet);
+		}
+		if (TotalSocket)
+		{
+			if (strlen(SendText) != 0)
+				if (ClientSockets != INVALID_SOCKET)
+					FD_SET(ClientSockets, &WriteSet);
+		}
+
+		//////////////////////////////////////////////////////////////////////////////////
+		TIMEVAL tval;
+		tval.tv_sec = 1;
+		tval.tv_usec = 0;
+
+		TIMEVAL *ptval;
+
+		ptval = &tval;
+
+		//////////////////////////////////////////////////////////////////////////////////
+		if ((readySock = select(0, &ReadSet, &WriteSet, NULL, ptval)) == SOCKET_ERROR)
+		{
+			throw" Select error ";
+		}
+
+		//Есть новые подключения
+		//////////////////////////////////////////////////////////////////////////////////
+		if (FD_ISSET(sServerListen, &ReadSet))
+		{
+
+			int iSize = sizeof(client);
+			ClientSockets = accept(sServerListen, (struct sockaddr *)&client, &iSize);
+
+			if (ClientSockets == INVALID_SOCKET)
 			{
-				throw "Error in recv!";
-		
+				throw" Creating client socket error ";
 			}
-			else if (bytesReceived == 0)
+			TotalSocket++;
+			cout << "Client connected"<<endl;
+		}
+		//////////////////////////////////////////////////////////////////////////////////
+		if (FD_ISSET(ClientSockets, &ReadSet))
+		{
+			int bytesReceived = recv(ClientSockets, RecvText, 1024, 0);
+
+			if (bytesReceived == 0)
 			{
-				cout << "The client closed the connection. " << endl;
+				closesocket(ClientSockets);
+				ClientSockets = INVALID_SOCKET;
+				throw" was bin recived 0 ";
 			}
-			else
+			else if (bytesReceived == SOCKET_ERROR)
 			{
-				EnterCriticalSection(&MyStream.mguard);
-				__try
-				{
-					Buffer[bytesReceived] = 0;
-					strcpy_s(MyStream.msg, Buffer);
-					MyStream.f_ready = 1;
-				}
-				__finally
-				{
-					LeaveCriticalSection(&MyStream.mguard);
-				}
+				throw" Recive data filed ";
+			}
+			//cout << string(RecvText, bytesReceived) << endl;
+			EnterCriticalSection(&MyStream.mguard);
+			__try
+			{
+			//	Buffer[bytesReceived] = 0;
+				strcpy_s(MyStream.msg, RecvText);
+				MyStream.f_ready = 1;
+			}
+			__finally
+			{
+				LeaveCriticalSection(&MyStream.mguard);
 			}
 
-			//cout << string(Buffer, bytesReceived) << endl;
+		}
+		//////////////////////////////////////////////////////////////////////////////////
+		if (FD_ISSET(ClientSockets, &WriteSet))
+		{
+			FD_CLR(ClientSockets, &WriteSet);
+			//if (SendText != 0)
+				send(ClientSockets, "LoL", strlen("LoL"), 0);
+			//memset(&out, 0, sizeof(out));
 
-			//send(ClientSocket, Buffer, bytesReceived + 1,0);// отправляем данные назад к клиенту (если нужно)
+		}	
 	}
 }
 
 
-
- unsigned int __stdcall StremServer::server_f(void *args)// _beginthreadex принемает только функции некоторого типа(__stdcall), поэтому тут и есть этот тип
+ unsigned  int  __stdcall StremServer:: server_f(void *args)
 {
 	try
 	{
 		WSockServer MyServer(REQ_WINSOCK_VER);
 		if (MyServer.RunServer(54000))
 		{
-			cout << "Client connected. " << endl;
+		//	cout << "Client connected. " << endl;
 			MyServer.StartChat();
 		}
 	}
@@ -116,17 +182,16 @@ void WSockServer::StartChat()
 	{
 		cout << "\nError: " << ErrMsg;
 		getchar();//Фунция просто ждет смвол (по типу system("pause");). Она есть есть и в Линукс
-		//f_stop = 1;
+				  //f_stop = 1;
 		throw "Stop";
-		return 1;//выход из функции и завершение потока
 	}
-	return 0;
 }
 
  void StremServer:: initializeCS()
 {
-	 InitializeCriticalSection(&mguard);
-	 server_h = (HANDLE)_beginthreadex(NULL, 0, server_f, NULL, 0, &ThId);
+
+	InitializeCriticalSection(&mguard);
+	server_h = (HANDLE)_beginthreadex(NULL, 0, server_f, NULL, 0, &ThId);
 };
 
  void StremServer::mainCS() {
