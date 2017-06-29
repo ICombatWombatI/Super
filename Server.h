@@ -13,7 +13,10 @@ using namespace std;
 
 //флаг готовности сообщения
 
-
+struct interThread {
+	int ready;
+	char msg[1024];
+} ;
 
 class WSockServer
 {
@@ -93,7 +96,7 @@ public:
 					chat[i] = buf[i];
 			}
 		}
-		
+	
 	
 		/*for (int i = 0, k = 0, j = 0; i<1024 || buf[i] == NULL; i++)
 		{
@@ -137,19 +140,22 @@ class  StremServer
 
 	static unsigned  int  __stdcall  server_f(void *args);
 
+
 	public:
 
+	static unsigned int __stdcall  fCin(void *);
 
 	int  f_ready;
 		// флаг остановки
 	int  f_stop;
 		// сообщение
-	char msg[100];
+	char msg[1024];
 		//критическая секция для недопущения одновременного доступа к msg из двух потоков
 	CRITICAL_SECTION mguard;
 
 	HANDLE server_h;
 
+	HANDLE hThread;
 
 	void initializeCS();
 

@@ -8,10 +8,13 @@ using namespace std;
 
 StremServer MyStream;
 
+interThread interThr;
+
 void main()
 {
+
 	MyStream.initializeCS();
-	
+
 	while (true)
 	{
 		try

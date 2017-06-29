@@ -1,6 +1,7 @@
 #include "Server.h"
 
 extern StremServer MyStream;
+extern interThread interThr;
 
 WSockServer::WSockServer(WORD RequestVersion)
 {
@@ -69,13 +70,16 @@ bool WSockServer::RunServer(int PortNumber)
 
 void WSockServer::StartChat()
 {
+	MyStream.hThread = (HANDLE)_beginthreadex(NULL, 0, MyStream.fCin, NULL, 0, NULL);
+
+	interThr.ready = 0;
 
 	while (true)
 	{
-		ZeroMemory(SendText, 1024);
-		ZeroMemory(RecvText, 1024);
+		ZeroMemory(SendText, sizeof(SendText));
+		ZeroMemory(RecvText, sizeof(RecvText));
 
-	//	cin.getline(SendText, 1024, '\n');
+	//	cin.getline(SendText, sizeof(SendText), '\n');
 
 		//////////////////////////////////////////////////////////////////////////////////
 		FD_ZERO(&ReadSet);
@@ -90,6 +94,12 @@ void WSockServer::StartChat()
 		}
 		if (TotalSocket)
 		{
+			if (interThr.ready == 1)
+			{
+				strcpy_s(SendText, interThr.msg);
+				interThr.ready = 0;
+			}
+
 			if (strlen(SendText) != 0)
 				if (ClientSockets != INVALID_SOCKET)
 					FD_SET(ClientSockets, &WriteSet);
@@ -128,7 +138,7 @@ void WSockServer::StartChat()
 		//////////////////////////////////////////////////////////////////////////////////
 		if (FD_ISSET(ClientSockets, &ReadSet))
 		{
-			int bytesReceived = recv(ClientSockets, RecvText, 1024, 0);
+			int bytesReceived = recv(ClientSockets, RecvText, sizeof(RecvText), 0);
 
 			if (bytesReceived == 0)
 			{
@@ -158,8 +168,9 @@ void WSockServer::StartChat()
 		if (FD_ISSET(ClientSockets, &WriteSet))
 		{
 			FD_CLR(ClientSockets, &WriteSet);
-			//if (SendText != 0)
-				send(ClientSockets, "LoL", strlen("LoL"), 0);
+			
+			if (SendText != 0)
+				send(ClientSockets, SendText, strlen(SendText), 0);
 			//memset(&out, 0, sizeof(out));
 
 		}	
@@ -176,6 +187,7 @@ void WSockServer::StartChat()
 		{
 		//	cout << "Client connected. " << endl;
 			MyServer.StartChat();
+
 		}
 	}
 	catch (char *ErrMsg)
@@ -186,6 +198,33 @@ void WSockServer::StartChat()
 		throw "Stop";
 	}
 }
+  unsigned int __stdcall StremServer::fCin(void *)
+ {
+
+	 AllocConsole();
+
+	 HANDLE myConsoleHandle = GetStdHandle(STD_INPUT_HANDLE);
+
+	 char command[1024];
+	 int charsRead = 0;
+	 while (1)
+	 {
+		 //	Sleep(100);
+		 ZeroMemory(command, sizeof(command));
+		 cin >> command;
+
+		 ZeroMemory(interThr.msg, sizeof(interThr.msg));
+
+		 strcpy_s(interThr.msg, command);
+
+		 interThr.ready = 1;
+		 /*if(strcmp(command, "exit")==0){
+		 interThr.ready=-1;
+		 break;
+		 }*/
+	 }
+	 return 0;
+ }
 
  void StremServer:: initializeCS()
 {
@@ -204,6 +243,7 @@ void WSockServer::StartChat()
 			 EnterCriticalSection(&mguard);
 			 __try
 			 { //структурна обработка исключений//  __try,__finally - механизм встроеный в виндовс который позволяет отлавливать ошибки (стандарт Win32app) 
+				 cout << endl;
 				 cout << "Message: " << msg << endl;
 				 f_ready = 0;
 			 }
