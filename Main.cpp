@@ -1,8 +1,7 @@
-
+#include <iostream>
 #include "Server.h"
 #include <process.h>
 
-#include <iostream>
 
 using namespace std;
 

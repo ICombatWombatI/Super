@@ -21,7 +21,6 @@ WSockServer::~WSockServer()
 		closesocket(sServerListen);
 }
 
-
 void WSockServer::SetServerSockAddr(sockaddr_in *hint, int PortNumber)
 {
 	hint->sin_family = AF_INET;
@@ -56,15 +55,7 @@ bool WSockServer::RunServer(int PortNumber)
 	int clientsize = sizeof(client);
 
 	cout << "Waiting for clients... ";
-	//char host[NI_MAXHOST]; //имя клиента(что то вроде)
-	//char service[NI_MAXSERV];
-
-	//cout << endl << "Server settings: " << endl;
-	//cout << "IP: " << inet_ntop(AF_INET, &client.sin_addr, host, NI_MAXHOST) << endl;
-	//cout << "PORT: " << ntohs(client.sin_port) << endl << endl;
-
-	//getnameinfo((sockaddr*)&client, sizeof(client), host, NI_MAXHOST, service, NI_MAXSERV, 0);
-	//cout << host << endl;
+	
 	return true;
 }
 
@@ -78,8 +69,6 @@ void WSockServer::StartChat()
 	{
 		ZeroMemory(SendText, sizeof(SendText));
 		ZeroMemory(RecvText, sizeof(RecvText));
-
-	//	cin.getline(SendText, sizeof(SendText), '\n');
 
 		//////////////////////////////////////////////////////////////////////////////////
 		FD_ZERO(&ReadSet);
@@ -119,7 +108,6 @@ void WSockServer::StartChat()
 		{
 			throw" Select error ";
 		}
-
 		//Есть новые подключения
 		//////////////////////////////////////////////////////////////////////////////////
 		if (FD_ISSET(sServerListen, &ReadSet))
@@ -135,6 +123,7 @@ void WSockServer::StartChat()
 			TotalSocket++;
 			cout << "Client connected"<<endl;
 		}
+		//Есть что получить
 		//////////////////////////////////////////////////////////////////////////////////
 		if (FD_ISSET(ClientSockets, &ReadSet))
 		{
@@ -150,11 +139,10 @@ void WSockServer::StartChat()
 			{
 				throw" Recive data filed ";
 			}
-			//cout << string(RecvText, bytesReceived) << endl;
+			//Критическая секция 
 			EnterCriticalSection(&MyStream.mguard);
 			__try
 			{
-			//	Buffer[bytesReceived] = 0;
 				strcpy_s(MyStream.msg, RecvText);
 				MyStream.f_ready = 1;
 			}
@@ -162,8 +150,8 @@ void WSockServer::StartChat()
 			{
 				LeaveCriticalSection(&MyStream.mguard);
 			}
-
 		}
+		//Есть что отправить
 		//////////////////////////////////////////////////////////////////////////////////
 		if (FD_ISSET(ClientSockets, &WriteSet))
 		{
@@ -171,12 +159,9 @@ void WSockServer::StartChat()
 			
 			if (SendText != 0)
 				send(ClientSockets, SendText, strlen(SendText), 0);
-			//memset(&out, 0, sizeof(out));
-
 		}	
 	}
 }
-
 
  unsigned  int  __stdcall StremServer:: server_f(void *args)
 {
@@ -185,32 +170,30 @@ void WSockServer::StartChat()
 		WSockServer MyServer(REQ_WINSOCK_VER);
 		if (MyServer.RunServer(54000))
 		{
-		//	cout << "Client connected. " << endl;
 			MyServer.StartChat();
-
 		}
 	}
 	catch (char *ErrMsg)
 	{
 		cout << "\nError: " << ErrMsg;
-		getchar();//Фунция просто ждет смвол (по типу system("pause");). Она есть есть и в Линукс
-				  //f_stop = 1;
+		getchar();//Фунция просто ждет смвол (по типу system("pause");). Она есть и в Линуксе
 		throw "Stop";
 	}
 }
+
   unsigned int __stdcall StremServer::fCin(void *)
  {
-
 	 AllocConsole();
 
 	 HANDLE myConsoleHandle = GetStdHandle(STD_INPUT_HANDLE);
 
 	 char command[1024];
 	 int charsRead = 0;
+
 	 while (1)
 	 {
-		 //	Sleep(100);
 		 ZeroMemory(command, sizeof(command));
+		 cout << endl;
 		 cin >> command;
 
 		 ZeroMemory(interThr.msg, sizeof(interThr.msg));
@@ -218,10 +201,11 @@ void WSockServer::StartChat()
 		 strcpy_s(interThr.msg, command);
 
 		 interThr.ready = 1;
-		 /*if(strcmp(command, "exit")==0){
-		 interThr.ready=-1;
-		 break;
-		 }*/
+		 if (strcmp(command, "exit") == 0) 
+		 {
+			 interThr.ready = -1;
+			 break;
+		 }
 	 }
 	 return 0;
  }
